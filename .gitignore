@@ -60,3 +60,9 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# Library package: dependents resolve their own versions.
+Package.resolved
+.swiftpm/
+# Local wendy-core checkout used by CI (WENDY_CORE_PATH).
+/wendy-core/
