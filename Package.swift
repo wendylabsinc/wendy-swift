@@ -6,7 +6,7 @@ import PackageDescription
 let core: Package.Dependency = if let path = Context.environment["WENDY_CORE_PATH"] {
     .package(path: path)
 } else {
-    .package(url: "https://github.com/wendylabsinc/wendy-core.git", from: "0.0.1")
+    .package(url: "https://github.com/wendylabsinc/wendy-core.git", from: "0.1.0")
 }
 
 let package = Package(
@@ -20,6 +20,9 @@ let package = Package(
             dependencies: [.product(name: "WendyCore", package: "wendy-core")],
             swiftSettings: [.enableUpcomingFeature("InternalImportsByDefault")]
         ),
-        .testTarget(name: "WendySwiftTests", dependencies: ["WendySwift"]),
+        .testTarget(
+            name: "WendySwiftTests",
+            dependencies: ["WendySwift", .product(name: "WendyCore", package: "wendy-core")]
+        ),
     ]
 )
