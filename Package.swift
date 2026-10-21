@@ -2,12 +2,11 @@
 import PackageDescription
 
 // WENDY_CORE_PATH selects a local wendy-core checkout whose Swift binaries were
-// built with `make swift` there. CI uses it, as does development until Wendy
-// Core publishes its first Swift release.
+// built with `make swift` there, for developing both repositories together.
 let core: Package.Dependency = if let path = Context.environment["WENDY_CORE_PATH"] {
     .package(path: path)
 } else {
-    .package(url: "https://github.com/wendylabsinc/wendy-core.git", from: "0.1.0")
+    .package(url: "https://github.com/wendylabsinc/wendy-core.git", from: "0.0.1")
 }
 
 let package = Package(
