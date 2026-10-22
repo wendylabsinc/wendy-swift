@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Temporary: revert to the released dependency after Wendy Core 0.1.0 ships.
+  # Temporary: revert to the released dependency after Wendy Core 0.1.0-seed.1 ships.
   WENDY_CORE_REF: 19fd8e515256a9b52204026a91961c3569fb1894
 
 jobs:

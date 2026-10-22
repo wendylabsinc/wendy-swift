@@ -18,9 +18,20 @@ Platforms: macOS 15+, iOS 18+ (device and Simulator), Linux x64 (glibc 2.35+) an
 ## Wendy Core dependency
 
 `Package.swift` depends on `https://github.com/wendylabsinc/wendy-core.git` from
-`0.1.0`, which is unreleased. `Wendy.coreVersion` requires the version API in that
-release. Once released, Core will carry prebuilt static libraries, so consumers
-will not need a Go compiler.
+`0.1.0-seed.1`, which is unreleased. `Wendy.coreVersion` requires the version API
+in that seed. Once released, Core will carry prebuilt static libraries, so
+consumers will not need a Go compiler.
+
+Consumers of WendySwift's first seed must explicitly allow pre-releases:
+
+```swift
+.package(url: "https://github.com/wendylabsinc/wendy-swift.git", from: "0.1.0-seed.1")
+```
+
+Use `from: "0.1.0-seed.1"` or a later seed as the lower bound. SwiftPM excludes
+pre-releases unless the requirement names one. This range also accepts later
+seeds and the stable `0.1.0` release. WendySwift's planned `v0.1.0-seed.1` tag
+resolves as version `0.1.0-seed.1` in SwiftPM.
 
 `Wendy.coreVersion` returns the linked Core binary's stamped build identity
 unchanged. Local Core builds report `<VERSION>-dev+<7-character commit>`, using
@@ -31,7 +42,7 @@ approach lets you change Wendy Core and WendySwift together:
 
 ```sh
 git clone https://github.com/wendylabsinc/wendy-core.git ../wendy-core
-git -C ../wendy-core checkout kb.sdk.2 # Version API, until Core 0.1.0 ships
+git -C ../wendy-core checkout kb.sdk.2 # Version API, until Core 0.1.0-seed.1 ships
 python3 ../wendy-core/scripts/build.py swift   # static Go libraries for this host; needs Go
 WENDY_CORE_PATH="$PWD/../wendy-core" swift test
 ```
