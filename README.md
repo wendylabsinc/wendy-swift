@@ -18,9 +18,9 @@ Platforms: macOS 15+, iOS 18+ (device and Simulator), Linux x64 (glibc 2.35+) an
 ## Wendy Core dependency
 
 `Package.swift` depends on `https://github.com/wendylabsinc/wendy-core.git` from
-`0.1.0-seed.1`, which is unreleased. `Wendy.coreVersion` requires the version API
-in that seed. Once released, Core will carry prebuilt static libraries, so
-consumers will not need a Go compiler.
+`0.1.0-seed.1`. [Wendy Core 0.1.0-seed.1](https://github.com/wendylabsinc/wendy-core/releases/tag/v0.1.0-seed.1)
+provides the version API and prebuilt static libraries, so `swift test` and CI
+resolve the released binaries without a Go compiler.
 
 Consumers of WendySwift's first seed must explicitly allow pre-releases:
 
@@ -34,26 +34,24 @@ seeds and the stable `0.1.0` release. WendySwift's planned `v0.1.0-seed.1` tag
 resolves as version `0.1.0-seed.1` in SwiftPM.
 
 `Wendy.coreVersion` returns the linked Core binary's stamped build identity
-unchanged. Local Core builds report `<VERSION>-dev+<7-character commit>`, using
-the Core checkout's commit. WendySwift does not derive its own version string.
+unchanged: `0.1.0-seed.1` with that release. Local Core builds report
+`<VERSION>-dev+<7-character commit>`, using the Core checkout's commit.
+WendySwift does not derive its own version string.
 
-Until then, build against a local checkout of Core's version-API branch. The same
-approach lets you change Wendy Core and WendySwift together:
+To develop Wendy Core and WendySwift together, optionally build against a local
+Core checkout instead:
 
 ```sh
 git clone https://github.com/wendylabsinc/wendy-core.git ../wendy-core
-git -C ../wendy-core checkout kb.sdk.2 # Version API, until Core 0.1.0-seed.1 ships
 python3 ../wendy-core/scripts/build.py swift   # static Go libraries for this host; needs Go
 WENDY_CORE_PATH="$PWD/../wendy-core" swift test
 ```
 
 The checkout directory must be named `wendy-core`, the package identity used in `Package.swift`.
 
-Core's branches, including `main`, need locally built binaries and cannot be
-consumed directly as remote SwiftPM dependencies. The build requires Go (see
-Core's `.go-version`) and, on macOS, Xcode. On macOS it builds the macOS, iOS and
-iOS Simulator libraries; on Linux it builds for the host architecture. CI uses a
-pinned Core source commit until the released dependency is available.
+This optional local build requires Go (see Core's `.go-version`) and, on macOS,
+Xcode. On macOS it builds the macOS, iOS and iOS Simulator libraries; on Linux it
+builds for the host architecture.
 
 ## License
 
