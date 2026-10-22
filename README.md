@@ -23,8 +23,8 @@ release. Once released, Core will carry prebuilt static libraries, so consumers
 will not need a Go compiler.
 
 `Wendy.coreVersion` returns the linked Core binary's stamped build identity
-unchanged, including any development suffix or commit metadata. It does not
-derive a version from the WendySwift checkout.
+unchanged. Local Core builds report `<VERSION>-dev+<7-character commit>`, using
+the Core checkout's commit. WendySwift does not derive its own version string.
 
 Until then, build against a local checkout of Core's version-API branch. The same
 approach lets you change Wendy Core and WendySwift together:
