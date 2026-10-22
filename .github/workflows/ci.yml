@@ -14,7 +14,7 @@ concurrency:
 
 env:
   # Temporary: revert to the released dependency after Wendy Core 0.1.0 ships.
-  WENDY_CORE_REF: a0e8ddc88e768f29b07b401046f4caa2cc4dfa4d
+  WENDY_CORE_REF: 2806e328246a26f43fcf2b437bb62e9154cd7e86
 
 jobs:
   test:
