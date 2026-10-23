@@ -53,8 +53,8 @@ public struct DeviceEnrollment: Sendable {
     /// request a class B credential, provision the agent and verify its principal.
     /// The app must obtain consent before calling. A failure after Cloud reserves the
     /// device will carry reservation details; the app must arrange removal in Cloud
-    /// before retrying. The eventual implementation will propagate task cancellation
-    /// as `CancellationError`. Not implemented; always throws `.notImplemented`.
+    /// before retrying. Cancellation and reservation recovery semantics remain under
+    /// design review. Not implemented; always throws `.notImplemented`.
     public func enroll(
         _ device: some RPCTransport,
         named name: DeviceName,
