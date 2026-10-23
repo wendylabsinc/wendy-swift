@@ -15,6 +15,24 @@ This is a scaffold: `helloWorld()` is a temporary operation that proves the SDK 
 
 Platforms: macOS 15+, iOS 18+ (device and Simulator), Linux x64 (glibc 2.35+) and arm64 (glibc 2.39+). Requires Swift 6.2+. Each process should link at most one Go-based library.
 
+## Proposed device enrollment API
+
+`DeviceEnrollment` proposes enrollment through an app-provided `OperatorSigner`
+and `RPCTransport` for Cloud and the device. These are **stubs only**: readiness,
+enrollment, device-name validation and name suggestions always throw
+`DeviceEnrollmentError` with code `.notImplemented`. Constructing configuration,
+transport values or the client performs no I/O. Nothing enrolls a device yet.
+
+The app will keep consent, discovery, key custody (CryptoKit in Companion) and
+OAuth/DPoP on its Cloud transport. Public signatures also compile on Linux; the
+SDK adds no cryptography or network implementation. Shared enrollment behavior
+and the host capability bridge still require a future Wendy Core contract.
+
+Errors require their original cause. Their `message`, `description` and debug
+text exclude causes and payloads; apps must use redacted cause details for error
+presentation. Transports must never put one-time enrollment credentials in logs
+or errors. There is no enrollment list API.
+
 ## Wendy Core dependency
 
 `Package.swift` depends on `https://github.com/wendylabsinc/wendy-core.git` from
