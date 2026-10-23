@@ -9,7 +9,7 @@ public struct DeviceEnrollmentError: Error, Sendable, CustomStringConvertible, C
         /// A diagnostic identifier for the failure category.
         public let description: String
 
-        /// The SDK operation is still a stub.
+        /// The operation is not implemented in this SDK version.
         public static let notImplemented = Self(
             description: "notImplemented",
             message: "This SDK operation has not been implemented."
@@ -166,7 +166,7 @@ public struct DeviceEnrollmentError: Error, Sendable, CustomStringConvertible, C
     /// Creates a failure while requiring and preserving its original cause.
     ///
     /// The message cannot accept arbitrary text or credential values. For failures
-    /// originating in the SDK, the underlying error will describe that local failure.
+    /// originating in the SDK, the underlying error describes that local failure.
     public init(code: Code, underlyingError: any Error, reservation: Reservation? = nil) {
         self.code = code
         self.underlyingError = underlyingError

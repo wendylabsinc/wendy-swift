@@ -6,8 +6,8 @@ public import Foundation
 
 /// Signs enrollment requests using an operator key held by the app.
 ///
-/// Companion will implement this capability with CryptoKit. The private key never
-/// crosses this interface. No cryptography is implemented by WendySwift's stubs.
+/// The app supplies the signing implementation, such as CryptoKit on Apple
+/// platforms. The private key never crosses this interface.
 public protocol OperatorSigner: Sendable {
     /// The signature algorithm of the held key; class B enrollment requires ML-DSA-65.
     var algorithm: SignatureAlgorithm { get }
@@ -19,7 +19,7 @@ public protocol OperatorSigner: Sendable {
 
     /// Signs the exact message bytes without pre-hashing by the SDK.
     ///
-    /// Will receive a complete JWS signing input and return the raw signature bytes.
+    /// Receives a complete JWS signing input and returns the raw signature bytes.
     /// Implementations must cooperate with task cancellation and keep secrets out of errors.
     func signature(for message: Data) async throws -> Data
 }

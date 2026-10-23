@@ -10,8 +10,7 @@ public enum Wendy {
         WendyCoreVersion()
     }
 
-    /// Returns 42 from Wendy Core: a temporary operation that proves the SDK
-    /// reaches the shared engine.
+    /// Returns 42 from Wendy Core to verify access to the shared engine.
     public static func helloWorld() -> Int32 {
         WendyHelloWorld()
     }

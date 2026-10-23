@@ -11,27 +11,39 @@ let coreVersion = Wendy.coreVersion // Version reported by the linked Core engin
 
 WendySwift is the Swift API for Wendy's apps (starting with Companion) and for third-party apps. It depends on Wendy Core's thin `WendyCore` Swift product, which links the shared Go engine statically. Shared behavior belongs in Wendy Core, so a fix there reaches every client and language; this SDK adds Swift conveniences on top, not separate product behavior.
 
-This is a scaffold: `helloWorld()` is a temporary operation that proves the SDK reaches the shared engine. Real APIs move in step by step.
-
 Platforms: macOS 15+, iOS 18+ (device and Simulator), Linux x64 (glibc 2.35+) and arm64 (glibc 2.39+). Requires Swift 6.2+. Each process should link at most one Go-based library.
 
-## Proposed device enrollment API
+## Device enrollment documentation
 
-`DeviceEnrollment` proposes enrollment through an app-provided `OperatorSigner`
-and `RPCTransport` for Cloud and the device. These are **stubs only**: readiness,
-enrollment, device-name validation and name suggestions always throw
-`DeviceEnrollmentError` with code `.notImplemented`. Constructing configuration,
-transport values or the client performs no I/O. Nothing enrolls a device yet.
+Read [Enrolling a Device](Sources/WendySwift/WendySwift.docc/EnrollingADevice.md)
+for the task, or the [Device Enrollment API Tour](Sources/WendySwift/WendySwift.docc/DeviceEnrollmentAPITour.md)
+for the new types in order of use. The DocC catalog also contains the API reference.
 
-The app will keep consent, discovery, key custody (CryptoKit in Companion) and
-OAuth/DPoP on its Cloud transport. Public signatures also compile on Linux; the
-SDK adds no cryptography or network implementation. Shared enrollment behavior
-and the host capability bridge still require a future Wendy Core contract.
+Each SDK increment is reviewed as one four-part package: a draft API PR, generated
+DocC documentation, a short task guide, and an API tour. API doc comments and
+articles describe the intended shipped behavior; the PR records implementation
+status and open design questions. Documentation examples are mirrored in
+`DocumentationExamplesTests.swift`, which compiles them without calling enrollment.
 
-Errors require their original cause. Their `message`, `description` and debug
-text exclude causes and payloads; apps must use redacted cause details for error
-presentation. Transports must never put one-time enrollment credentials in logs
-or errors. There is no enrollment list API.
+### Build and read the docs locally
+
+With Xcode selected on macOS, generate symbol graphs and convert the catalog
+without installing a documentation package dependency:
+
+```sh
+mkdir -p .build/symbol-graphs .build/docc-symbols
+swift build --target WendySwift -Xswiftc -emit-symbol-graph \
+  -Xswiftc -emit-symbol-graph-dir -Xswiftc "$PWD/.build/symbol-graphs"
+cp .build/symbol-graphs/WendySwift*.symbols.json .build/docc-symbols/
+xcrun docc convert Sources/WendySwift/WendySwift.docc \
+  --additional-symbol-graph-dir .build/docc-symbols \
+  --output-path .build/WendySwift.doccarchive \
+  --transform-for-static-hosting --warnings-as-errors
+python3 -m http.server 8083 --bind 127.0.0.1 --directory .build/WendySwift.doccarchive
+```
+
+Open <http://127.0.0.1:8083/documentation/wendyswift/>. Generated files stay in
+`.build/` and are not committed.
 
 ## Wendy Core dependency
 

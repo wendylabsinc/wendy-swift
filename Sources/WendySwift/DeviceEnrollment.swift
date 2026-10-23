@@ -6,13 +6,11 @@ public import Foundation
 
 /// Enrolls nearby WendyOS devices in an organization.
 ///
-/// This proposed API is not implemented. Readiness and enrollment always throw
-/// `DeviceEnrollmentError` with code `.notImplemented`, without calling the host.
 /// The app owns discovery, consent, operator key custody and authenticated transports.
 public struct DeviceEnrollment: Sendable {
     /// The endpoints and audience used for device enrollment.
     public struct Configuration: Sendable, Hashable {
-        /// The Cloud endpoint the enrolled device will connect to, as `host:port`.
+        /// The Cloud endpoint the enrolled device connects to, as `host:port`.
         public var cloudEndpoint: String
 
         /// The ACME service's base URL, before the organization's directory path.
@@ -32,7 +30,7 @@ public struct DeviceEnrollment: Sendable {
     /// Creates an enrollment client using the app's Cloud transport and operator signer.
     ///
     /// Only stores these capabilities; it performs no validation, signing or I/O.
-    /// The Cloud transport will attach OAuth and DPoP credentials as needed.
+    /// The Cloud transport attaches OAuth and DPoP credentials as needed.
     public init(configuration: Configuration, cloud: some RPCTransport, signer: some OperatorSigner) {
         self.configuration = configuration
         self.cloud = cloud
@@ -41,20 +39,19 @@ public struct DeviceEnrollment: Sendable {
 
     /// Checks whether the device reached by the transport can enroll, without changing it.
     ///
-    /// Will check the agent's provisioning state and ACME capability before any
-    /// Cloud reservation. Not implemented; always throws `.notImplemented`.
+    /// Checks the agent's provisioning state and ACME capability before any
+    /// Cloud reservation.
     public func readiness(of device: some RPCTransport) async throws -> EnrollmentReadiness {
         throw DeviceEnrollmentError.notImplemented(operation: "DeviceEnrollment.readiness(of:)")
     }
 
     /// Enrolls the device reached by the transport under a name in the organization.
     ///
-    /// Will check readiness and the operator's organization, read hardware best-effort,
-    /// request a class B credential, provision the agent and verify its principal.
+    /// Checks readiness and the operator's organization, reads hardware best-effort,
+    /// requests a class B credential, provisions the agent and verifies its principal.
     /// The app must obtain consent before calling. A failure after Cloud reserves the
-    /// device will carry reservation details; the app must arrange removal in Cloud
-    /// before retrying. Cancellation and reservation recovery semantics remain under
-    /// design review. Not implemented; always throws `.notImplemented`.
+    /// device carries reservation details; the app must confirm the Cloud state and
+    /// arrange removal of any reservation before retrying.
     public func enroll(
         _ device: some RPCTransport,
         named name: DeviceName,
@@ -78,16 +75,15 @@ public struct DeviceName: Hashable, Sendable, CustomStringConvertible {
 
     /// Validates a device name and creates its value.
     ///
-    /// Will require `^[a-z][a-z0-9-]{0,62}$` without a trailing hyphen and throw
-    /// `.invalidName` otherwise. Not implemented; always throws `.notImplemented`.
+    /// Requires `^[a-z][a-z0-9-]{0,62}$` without a trailing hyphen and throws
+    /// `DeviceEnrollmentError` with code `.invalidName` otherwise.
     public init(_ name: String) throws(DeviceEnrollmentError) {
         throw DeviceEnrollmentError.notImplemented(operation: "DeviceName.init(_:)")
     }
 
     /// Suggests a valid name from a host name, or returns nil when none fits.
     ///
-    /// Will lowercase the host and remove its `.local` suffix, following the CLI.
-    /// Not implemented; always throws `.notImplemented`.
+    /// Lowercases the host and removes its `.local` suffix, following the CLI.
     public static func suggested(forHost host: String) throws(DeviceEnrollmentError) -> DeviceName? {
         throw DeviceEnrollmentError.notImplemented(operation: "DeviceName.suggested(forHost:)")
     }
