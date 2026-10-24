@@ -64,3 +64,5 @@ fastlane/test_output
 # Library package: dependents resolve their own versions.
 Package.resolved
 .swiftpm/
+
+__pycache__/

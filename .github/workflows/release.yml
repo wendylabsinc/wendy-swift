@@ -1,0 +1,117 @@
+name: Release WendySwift pre-release
+
+# A source trigger tag is deliberately outside SwiftPM's version syntax.
+# Only the generated bare version tag points to a binary-URL manifest.
+on:
+  push:
+    tags: ['swift-preview/*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wendy-swift-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - id: version
+        env:
+          SOURCE_TAG: ${{ github.ref_name }}
+        run: |
+          version=$(python3 scripts/release.py version --version "${SOURCE_TAG#swift-preview/}")
+          # SwiftPM normalizes an optional v prefix. Never create a second
+          # spelling of a version already released by the old workflow.
+          if git rev-parse --verify "refs/tags/v$version" >/dev/null 2>&1; then
+            echo "This version already has a v-prefixed SwiftPM tag" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
+  build:
+    needs: validate
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build.yml
+    with:
+      test-host: false
+      artifact-prefix: release-core
+  publish:
+    needs: [validate, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-core-*
+          path: .build/downloads
+      - name: Assemble the tested Core archives
+        run: |
+          python3 scripts/release.py collect
+          python3 scripts/release.py assemble
+          python3 scripts/release.py manifest --version "$VERSION"
+      - uses: swift-actions/setup-swift@7ca6abe6b3b0e8b5421b88be48feee39cbf52c6a # v2.4.0
+        with:
+          swift-version: '6.2.1'
+      - name: Test an ordinary SwiftPM consumer of the assembled archives
+        run: python3 scripts/smoke.py .build/release-assets
+      - name: Verify immutable assets on a release retry
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$VERSION" --repo wendylabsinc/wendy-swift >/dev/null 2>&1; then
+            mkdir -p .build/existing-assets
+            gh release download "$VERSION" --repo wendylabsinc/wendy-swift --dir .build/existing-assets
+            for file in .build/release-assets/*.zip; do
+              existing=".build/existing-assets/$(basename "$file")"
+              if [ -e "$existing" ]; then
+                cmp "$file" "$existing"
+              fi
+            done
+          fi
+      - name: Push the release-only SwiftPM manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # Preserve the original source commit as the release commit's parent.
+          git add Package.swift
+          git commit -m "build: package WendySwift $VERSION"
+          # A retry may reuse an identical release, but never move an existing tag.
+          if git rev-parse --verify "refs/tags/$VERSION" >/dev/null 2>&1; then
+            test "$(git rev-parse "$VERSION^")" = "$(git rev-parse HEAD^)"
+            git diff --exit-code "$VERSION" HEAD
+          else
+            git tag "$VERSION"
+            gh auth setup-git
+            git push https://github.com/wendylabsinc/wendy-swift.git "refs/tags/$VERSION"
+          fi
+      - uses: softprops/action-gh-release@5113cdc90fd4d541c801c55356214017bf5ae34b # v3.0.3
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: WendySwift ${{ env.VERSION }}
+          prerelease: true
+          fail_on_unmatched_files: true
+          overwrite_files: false
+          body: Built from the source trigger tag with Core pinned in scripts/core-revision. SwiftPM consumers use this bare version tag.
+          files: |
+            .build/release-assets/CWendyCore.xcframework.zip
+            .build/release-assets/CWendyCore.artifactbundle.zip
