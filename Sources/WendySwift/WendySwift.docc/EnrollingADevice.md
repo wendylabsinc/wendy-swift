@@ -21,30 +21,33 @@ attestation.
 
 ## Check readiness and enroll
 
-This function takes an already-confirmed device selection. It returns nil when
-the agent is not ready; use ``EnrollmentReadiness/obstacle`` and
-``EnrollmentReadiness/reason`` to explain that state in your app.
+Check readiness separately so your app retains the full snapshot, including
+``EnrollmentReadiness/obstacle`` and ``EnrollmentReadiness/reason``, for presentation.
 
 ```swift
 import Foundation
 import WendySwift
 
+func checkEnrollmentReadiness(
+    enrollment: DeviceEnrollment,
+    device: any RPCTransport
+) async throws -> EnrollmentReadiness {
+    try await enrollment.readiness(of: device)
+}
+```
+
+Once the device is ready and the person has confirmed enrollment, pass their
+chosen name and organization to the client.
+
+```swift
 func enrollConfirmedDevice(
-    configuration: DeviceEnrollment.Configuration,
-    cloud: any RPCTransport,
+    enrollment: DeviceEnrollment,
     device: any RPCTransport,
-    signer: any OperatorSigner,
     organizationUUID: UUID,
     requestedName: String
-) async throws -> EnrolledDevice? {
+) async throws -> EnrolledDevice {
     let organization = OrganizationID(organizationUUID)
     let name = try DeviceName(requestedName)
-    let enrollment = DeviceEnrollment(
-        configuration: configuration, cloud: cloud, signer: signer
-    )
-    let readiness = try await enrollment.readiness(of: device)
-    guard readiness.isReady else { return nil }
-
     return try await enrollment.enroll(device, named: name, in: organization)
 }
 ```

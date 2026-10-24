@@ -1,84 +1,66 @@
 # Device Enrollment API Tour
 
-Walk through the enrollment APIs in the order an app uses them.
+Use the new calls to prepare, enroll, and recover a device.
 
-## 1. Supply capabilities and configuration
+The examples use your app's configuration, signer, transports, organization UUID,
+and UI callbacks. For transport and signing details, see <doc:WendySwift#App-capabilities>.
 
-``OperatorSigner`` exposes an algorithm, a leaf-first DER certificate chain, and
-raw signatures over the exact JWS input. ``SignatureAlgorithm/mlDSA65`` identifies
-the algorithm used for class B enrollment. The app keeps private-key custody.
+## 1. Make the client
 
-``RPCTransport`` sends unary protobuf requests. Its ``RPCRequest`` carries the
-method, serialized bytes, metadata, and timeout; ``RPCResponse`` separates initial
-metadata from trailers. ``RPCMetadata`` preserves ordered, repeated entries and
-binary values. An adapter reports a non-OK status using ``RPCStatusError`` and the
-extensible ``RPCStatusCode``, retaining the original cause and trailers.
-
-Build a ``DeviceEnrollment`` client from the Cloud transport, signer, and the
-three environment settings. The device transport is supplied per operation.
-These example hosts are placeholders for your deployment's endpoints.
+Pass your Cloud transport and operator signer to ``DeviceEnrollment``.
 
 ```swift
-import Foundation
-import WendySwift
+let enrollment = DeviceEnrollment(
+    configuration: configuration, cloud: cloud, signer: signer
+)
+```
 
-func makeEnrollmentClient(
-    certificateAuthority: URL,
-    cloud: any RPCTransport,
-    signer: any OperatorSigner
-) -> DeviceEnrollment {
-    let configuration = DeviceEnrollment.Configuration(
-        cloudEndpoint: "api.example.test:443",
-        certificateAuthority: certificateAuthority,
-        requestAudience: "https://cloud.example.test/broker"
+## 2. Make a name
+
+``DeviceName`` validates the chosen DNS label; ``OrganizationID`` takes the tenant UUID.
+
+```swift
+let name = try DeviceName("workbench")
+let organization = OrganizationID(organizationUUID)
+```
+
+## 3. Check readiness
+
+Check the selected device before offering enrollment, and present any obstacle and reason.
+
+```swift
+let readiness = try await enrollment.readiness(of: deviceTransport)
+if let obstacle = readiness.obstacle {
+    showReadiness(obstacle, readiness.reason)
+}
+```
+
+## 4. Enroll
+
+After a ready snapshot and the person's consent, enroll the device and use its returned identity.
+
+```swift
+let device = try await enrollment.enroll(
+    deviceTransport, named: name, in: organization
+)
+showEnrolledDevice(device)
+```
+
+## 5. Handle a failure
+
+Wrap the enrollment call to present its error with redacted cause details.
+If it carries a reservation, confirm the Cloud state and remove any reservation before retrying.
+
+```swift
+do {
+    let device = try await enrollment.enroll(
+        deviceTransport, named: name, in: organization
     )
-    return DeviceEnrollment(configuration: configuration, cloud: cloud, signer: signer)
+    showEnrolledDevice(device)
+} catch let error as DeviceEnrollmentError {
+    showEnrollmentError(error)
+    if let reservation = error.reservation {
+        checkCloudReservation(reservation)
+    }
 }
 ```
-
-## 2. Choose an organization and name
-
-``OrganizationID`` wraps the immutable tenant UUID. ``DeviceName`` validates an
-organization-unique DNS label: 1–63 lowercase letters, digits, or hyphens, beginning
-with a letter and not ending in a hyphen. Host-name suggestions lowercase the host
-and remove `.local`; nil means no valid suggestion is available.
-
-```swift
-func suggestedEnrollmentName(for host: String) throws -> DeviceName? {
-    try DeviceName.suggested(forHost: host)
-}
-```
-
-Use ``DeviceName/init(_:)`` for the person's chosen label. The guide's
-<doc:EnrollingADevice> example combines it with the organization and client.
-
-## 3. Check the device and enroll it
-
-Call ``DeviceEnrollment/readiness(of:)`` to obtain ``EnrollmentReadiness``.
-An absent obstacle means the snapshot is ready. Otherwise, ``EnrollmentReadiness/Obstacle``
-distinguishes an enrolled device, an outdated agent, an unsupported device, or a
-pending reset. Discovery and consent stay in your app; there is no list API.
-
-After consent, ``DeviceEnrollment/enroll(_:named:in:)`` returns ``EnrolledDevice``.
-Its ``DeviceID`` is permanent and also identifies the Cloud asset. The result's
-principal is the device's SPIFFE certificate identity; its name can change without
-changing that identity. IDs and results are plain values, and all enrollment
-values and capabilities are `Sendable`.
-
-## 4. Preserve recovery information
-
-``DeviceEnrollmentError/Code`` provides extensible failure categories. Compare
-codes such as `.invalidName` or `.nameUnavailable` instead of parsing messages.
-``DeviceEnrollmentError/Reservation`` identifies a known or possible Cloud
-reservation without exposing the enrollment credential.
-
-```swift
-func reservationToCheck(after error: any Error) -> DeviceEnrollmentError.Reservation? {
-    (error as? DeviceEnrollmentError)?.reservation
-}
-```
-
-Use that reservation to guide a Cloud state check and removal before retrying.
-The SDK message and debug text exclude original causes, metadata, and reservation
-values. Keep the original error for diagnosis and redact its details before
-presentation; a safe summary alone does not replace those details.

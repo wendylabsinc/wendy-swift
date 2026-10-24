@@ -2,53 +2,81 @@ import Foundation
 import Testing
 import WendySwift
 
-// Mirrored from the guide and tour. Keep these examples in sync with their articles.
+// Mirrored from the guide and tour; compile these examples, but never invoke them.
+
+func checkEnrollmentReadiness(
+    enrollment: DeviceEnrollment,
+    device: any RPCTransport
+) async throws -> EnrollmentReadiness {
+    try await enrollment.readiness(of: device)
+}
 
 func enrollConfirmedDevice(
-    configuration: DeviceEnrollment.Configuration,
-    cloud: any RPCTransport,
+    enrollment: DeviceEnrollment,
     device: any RPCTransport,
-    signer: any OperatorSigner,
     organizationUUID: UUID,
     requestedName: String
-) async throws -> EnrolledDevice? {
+) async throws -> EnrolledDevice {
     let organization = OrganizationID(organizationUUID)
     let name = try DeviceName(requestedName)
-    let enrollment = DeviceEnrollment(
-        configuration: configuration, cloud: cloud, signer: signer
-    )
-    let readiness = try await enrollment.readiness(of: device)
-    guard readiness.isReady else { return nil }
-
     return try await enrollment.enroll(device, named: name, in: organization)
 }
 
-func makeEnrollmentClient(
-    certificateAuthority: URL,
+@MainActor
+private func tourEnrollmentCalls(
+    configuration: DeviceEnrollment.Configuration,
     cloud: any RPCTransport,
-    signer: any OperatorSigner
-) -> DeviceEnrollment {
-    let configuration = DeviceEnrollment.Configuration(
-        cloudEndpoint: "api.example.test:443",
-        certificateAuthority: certificateAuthority,
-        requestAudience: "https://cloud.example.test/broker"
+    signer: any OperatorSigner,
+    organizationUUID: UUID,
+    deviceTransport: any RPCTransport,
+    showReadiness: (EnrollmentReadiness.Obstacle, String?) -> Void,
+    showEnrolledDevice: (EnrolledDevice) -> Void
+) async throws {
+    let enrollment = DeviceEnrollment(
+        configuration: configuration, cloud: cloud, signer: signer
     )
-    return DeviceEnrollment(configuration: configuration, cloud: cloud, signer: signer)
+    let name = try DeviceName("workbench")
+    let organization = OrganizationID(organizationUUID)
+    let readiness = try await enrollment.readiness(of: deviceTransport)
+    if let obstacle = readiness.obstacle {
+        showReadiness(obstacle, readiness.reason)
+    }
+    guard readiness.isReady else { return }
+    let device = try await enrollment.enroll(
+        deviceTransport, named: name, in: organization
+    )
+    showEnrolledDevice(device)
 }
 
-func suggestedEnrollmentName(for host: String) throws -> DeviceName? {
-    try DeviceName.suggested(forHost: host)
-}
-
-func reservationToCheck(after error: any Error) -> DeviceEnrollmentError.Reservation? {
-    (error as? DeviceEnrollmentError)?.reservation
+@MainActor
+private func tourEnrollmentFailure(
+    enrollment: DeviceEnrollment,
+    deviceTransport: any RPCTransport,
+    name: DeviceName,
+    organization: OrganizationID,
+    showEnrolledDevice: (EnrolledDevice) -> Void,
+    showEnrollmentError: (DeviceEnrollmentError) -> Void,
+    checkCloudReservation: (DeviceEnrollmentError.Reservation) -> Void
+) async throws {
+    do {
+        let device = try await enrollment.enroll(
+            deviceTransport, named: name, in: organization
+        )
+        showEnrolledDevice(device)
+    } catch let error as DeviceEnrollmentError {
+        showEnrollmentError(error)
+        if let reservation = error.reservation {
+            checkCloudReservation(reservation)
+        }
+    }
 }
 
 @Test
+@MainActor
 func `documentation examples type check without enrolling`() {
     // Refer to each example without invoking it or constructing host capabilities.
+    _ = checkEnrollmentReadiness
     _ = enrollConfirmedDevice
-    _ = makeEnrollmentClient
-    _ = suggestedEnrollmentName
-    _ = reservationToCheck
+    _ = tourEnrollmentCalls
+    _ = tourEnrollmentFailure
 }
