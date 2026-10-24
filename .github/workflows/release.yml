@@ -53,7 +53,6 @@ jobs:
       contents: write
     env:
       VERSION: ${{ needs.validate.outputs.version }}
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -68,9 +67,14 @@ jobs:
           python3 scripts/release.py collect
           python3 scripts/release.py assemble
           python3 scripts/release.py manifest --version "$VERSION"
+      - uses: swift-actions/setup-swift@7ca6abe6b3b0e8b5421b88be48feee39cbf52c6a # v2.4.0
+        with:
+          swift-version: '6.2.1'
       - name: Test an ordinary SwiftPM consumer of the assembled archives
-        run: docker run --rm -v "$PWD:/src" -w /src swift:6.2.1-noble python3 scripts/smoke.py .build/release-assets
+        run: python3 scripts/smoke.py .build/release-assets
       - name: Verify immutable assets on a release retry
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "$VERSION" --repo wendylabsinc/wendy-swift >/dev/null 2>&1; then
             mkdir -p .build/existing-assets
@@ -83,6 +87,8 @@ jobs:
             done
           fi
       - name: Push the release-only SwiftPM manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'

@@ -39,8 +39,11 @@ jobs:
         with:
           pattern: test-core-*
           path: .build/downloads
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.2.1'
       - name: Assemble and consume the release archive layout
         run: |
           python3 scripts/release.py collect --prefix test-core-
           python3 scripts/release.py assemble
-          docker run --rm -v "$PWD:/src" -w /src swift:6.2.1-noble python3 scripts/smoke.py .build/release-assets
+          python3 scripts/smoke.py .build/release-assets
