@@ -77,6 +77,17 @@ jobs:
             xcodebuild build-for-testing -quiet -scheme wendy-swift-Package \
               -destination "$destination" -derivedDataPath .build/ios
           done
+      - if: inputs.test-host
+        name: Rebuild production archives without the test caller
+        run: python3 scripts/build-core.py
+      - if: inputs.test-host && runner.os == 'Linux'
+        name: Verify the production Core on Linux
+        env:
+          SWIFT_IMAGE: ${{ matrix.swift-image }}
+        run: docker run --rm -v "$PWD:/src" -w /src "$SWIFT_IMAGE" swift test --scratch-path /tmp/production-swift
+      - if: inputs.test-host && runner.os == 'macOS'
+        name: Verify the production Core on macOS
+        run: swift test
       - if: runner.os == 'macOS'
         uses: actions/upload-artifact@v7
         with:
