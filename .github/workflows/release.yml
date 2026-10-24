@@ -24,11 +24,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - id: version
         env:
           SOURCE_TAG: ${{ github.ref_name }}
         run: |
           version=$(python3 scripts/release.py version --version "${SOURCE_TAG#swift-preview/}")
+          # SwiftPM normalizes an optional v prefix. Never create a second
+          # spelling of a version already released by the old workflow.
+          if git rev-parse --verify "refs/tags/v$version" >/dev/null 2>&1; then
+            echo "This version already has a v-prefixed SwiftPM tag" >&2
+            exit 1
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
   build:
