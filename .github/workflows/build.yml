@@ -62,7 +62,7 @@ jobs:
         env:
           SWIFT_IMAGE: ${{ matrix.swift-image }}
           WENDY_BRIDGE_TESTS: ${{ inputs.test-host && '1' || '0' }}
-        run: docker run --rm -e WENDY_BRIDGE_TESTS -v "$PWD:/src" -w /src "$SWIFT_IMAGE" swift test --scratch-path /tmp/swift
+        run: docker run --rm -e WENDY_BRIDGE_TESTS -e WENDY_CORE_PATH=/src/.build/WendyOS/go/wendy-core -v "$PWD:/src" -w /src "$SWIFT_IMAGE" swift test --scratch-path /tmp/swift
       - if: runner.os == 'macOS'
         name: Test macOS
         env:

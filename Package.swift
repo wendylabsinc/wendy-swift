@@ -10,10 +10,16 @@ let binaryTargets: [Target] = [
     ("CWendyCoreApple", "CWendyCore.xcframework"),
     ("CWendyCoreLinux", "CWendyCore.artifactbundle"),
 ].compactMap { name, file in
-    let path = corePath + "/distributions/swift/artifacts/" + file
-    return FileManager.default.fileExists(atPath: Context.packageDirectory + "/" + path)
-        || FileManager.default.fileExists(atPath: path)
-        ? .binaryTarget(name: name, path: path) : nil
+    let root = URL(fileURLWithPath: Context.packageDirectory, isDirectory: true)
+    let artifact = URL(fileURLWithPath: corePath, relativeTo: root)
+        .appendingPathComponent("distributions/swift/artifacts/" + file).standardizedFileURL
+    guard FileManager.default.fileExists(atPath: artifact.path) else { return nil }
+    // SwiftPM requires relative binary paths, including for absolute overrides.
+    let base = root.standardizedFileURL.pathComponents
+    let parts = artifact.pathComponents
+    let common = zip(base, parts).prefix { $0 == $1 }.count
+    let path = (Array(repeating: "..", count: base.count - common) + parts.dropFirst(common)).joined(separator: "/")
+    return .binaryTarget(name: name, path: path)
 }
 // END BINARY TARGETS
 
