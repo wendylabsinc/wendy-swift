@@ -11,11 +11,12 @@ public final class HostRegistration: Sendable {
     public let handle: UInt64
 
     public init(signer: any Signer, transport: any Transport) throws {
-        guard !signer.algorithm.isEmpty else { throw HostRegistrationError.emptyAlgorithm }
+        let algorithm = signer.algorithm
+        guard !algorithm.isEmpty else { throw HostRegistrationError.emptyAlgorithm }
         let context = Unmanaged.passRetained(HostContext(signer: signer, transport: transport))
         let arena = HostArena()
         var callbacks = WendyHostCallbacks(
-            context: context.toOpaque(), algorithm: arena.bytes(Array(signer.algorithm.utf8)),
+            context: context.toOpaque(), algorithm: arena.bytes(Array(algorithm.utf8)),
             start: { context, call, request in
                 guard let context, let request else { return }
                 // All borrowed request views are copied before this callback returns.

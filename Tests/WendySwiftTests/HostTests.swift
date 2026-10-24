@@ -22,13 +22,16 @@ private struct BridgeResult: Decodable, Sendable {
 }
 
 private func invoke(_ handle: UInt64, operation: UInt32, timeout: Int64 = 5_000) async throws -> BridgeResult {
-    // The test-only Go caller blocks on its context; keep it off the Swift
-    // cooperative executor so Swift callbacks can complete on a single core.
-    let data = await Task.detached {
-        let pointer = WendySwiftTestInvoke(handle, operation, timeout)!
-        defer { free(pointer) }
-        return Data(String(cString: pointer).utf8)
-    }.value
+    // A synchronous Go caller must use a dedicated OS thread. Task.detached
+    // still uses Swift's cooperative pool and would starve host callback tasks
+    // when many C callers are waiting concurrently.
+    let data: Data = await withCheckedContinuation { continuation in
+        Thread.detachNewThread {
+            let pointer = WendySwiftTestInvoke(handle, operation, timeout)!
+            defer { free(pointer) }
+            continuation.resume(returning: Data(String(cString: pointer).utf8))
+        }
+    }
     // Go encodes []byte as base64, unlike ordinary JSON arrays.
     let decoder = JSONDecoder()
     return try decoder.decode(BridgeResult.self, from: normalizeBytes(data))
@@ -81,15 +84,21 @@ private struct FakeTransport: Transport {
         return RPCResponse(message: request.message, initialMetadata: headers, trailingMetadata: trailers)
     }
     var stream: any ServerStream = FakeStream()
+    var openingError: RPCStatusError? = nil
     func unary(_ request: RPCRequest) async throws -> RPCResponse { try await unaryBody(request) }
-    func serverStream(_ request: RPCRequest) async throws -> any ServerStream { stream }
+    func serverStream(_ request: RPCRequest) async throws -> any ServerStream {
+        if let openingError { throw openingError }
+        return stream
+    }
 }
 
 private actor FakeStream: ServerStream {
     var index = 0
     let terminal: RPCStatusError?
+    let closed = Mutex(false)
+    func wasClosed() -> Bool { closed.withLock { $0 } }
     init(terminal: RPCStatusError? = nil) { self.terminal = terminal }
-    nonisolated func close() {}
+    nonisolated func close() { closed.withLock { $0 = true } }
     func initialMetadata() -> [RPCMetadataEntry] { headers }
     func next() throws -> [UInt8]? {
         defer { index += 1 }
@@ -157,13 +166,15 @@ private actor FakeStream: ServerStream {
 }
 
 @Test func `streams ordered binary and empty messages with headers and trailers`() async throws {
-    let host = try HostRegistration(signer: FakeSigner(), transport: FakeTransport())
+    let stream = FakeStream()
+    let host = try HostRegistration(signer: FakeSigner(), transport: FakeTransport(stream: stream))
     defer { host.close() }
     let result = try await invoke(host.handle, operation: 5)
     #expect(result.Messages == [[0, 255], [], [42]])
     #expect(result.Initial?.first?.Value == [0, 255])
     #expect(result.Trailing?.first?.Name == "trailer")
     #expect(result.Error.isEmpty)
+    try await waitUntil { await stream.wasClosed() }
 }
 
 @Test func `delivers accepted stream items before terminal status`() async throws {
@@ -234,5 +245,50 @@ private func waitUntil(_ condition: () async -> Bool) async throws {
     let handle = host!.handle
     host = nil
     #expect(try await invoke(handle, operation: 1).Cancelled)
+}
+@Test func `concurrent host calls keep their completions isolated`() async throws {
+    let host = try HostRegistration(signer: FakeSigner(), transport: FakeTransport())
+    defer { host.close() }
+    try await withThrowingTaskGroup(of: Void.self) { group in
+        for _ in 0..<32 {
+            group.addTask {
+                let result = try await invoke(host.handle, operation: 1)
+                #expect(result.Message == [42, 255, 0])
+                #expect(result.Error.isEmpty)
+            }
+        }
+        try await group.waitForAll()
+    }
+}
+
+@Test func `opening a stream preserves status and metadata`() async throws {
+    let host = try HostRegistration(signer: FakeSigner(), transport: FakeTransport(
+        openingError: RPCStatusError(code: 16, message: "stream rejected", initialMetadata: headers, trailingMetadata: trailers)))
+    defer { host.close() }
+    let result = try await invoke(host.handle, operation: 5)
+    #expect(result.Code == 16)
+    #expect(result.StatusMessage == "stream rejected")
+    #expect(result.Initial?.first?.Value == [0, 255])
+    #expect(result.Trailing?.first?.Name == "trailer")
+}
+
+private actor BlockingStream: ServerStream {
+    let probe = CancellationProbe()
+    let closed = Mutex(false)
+    func initialMetadata() -> [RPCMetadataEntry] { headers }
+    func next() async throws -> [UInt8]? { try await probe.run() }
+    func trailingMetadata() -> [RPCMetadataEntry] { [] }
+    nonisolated func close() { closed.withLock { $0 = true } }
+    func wasClosed() -> Bool { closed.withLock { $0 } }
+}
+
+@Test func `stream deadline cancels blocked reads and closes host resources`() async throws {
+    let stream = BlockingStream()
+    let host = try HostRegistration(signer: FakeSigner(), transport: FakeTransport(stream: stream))
+    defer { host.close() }
+    let result = try await invoke(host.handle, operation: 5, timeout: 100)
+    #expect(result.Cancelled)
+    try await waitUntil { await stream.wasClosed() }
+    #expect(await stream.probe.cancelled)
 }
 #endif

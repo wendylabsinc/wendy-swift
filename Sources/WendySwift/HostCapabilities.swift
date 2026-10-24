@@ -26,6 +26,13 @@ public struct RPCRequest: Sendable, Equatable {
     public var metadata: [RPCMetadataEntry]
     /// Absolute UTC Unix milliseconds; nil means no Core deadline.
     public var deadlineUnixMilliseconds: Int64?
+
+    public init(method: String, message: [UInt8], metadata: [RPCMetadataEntry] = [], deadlineUnixMilliseconds: Int64? = nil) {
+        self.method = method
+        self.message = message
+        self.metadata = metadata
+        self.deadlineUnixMilliseconds = deadlineUnixMilliseconds
+    }
 }
 
 public struct RPCResponse: Sendable, Equatable {
