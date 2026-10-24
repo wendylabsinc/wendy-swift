@@ -117,7 +117,12 @@ private actor Inventory {
         #expect(request.method == method)
         #expect(request.deadlineUnixMilliseconds == deadline)
         // Canonical Cloud ListAssetsRequest; Core alone supplies paging selectors.
-        #expect(request.message == [0x0a, 36] + Array(tenant.utf8) + [0x10, 1, 0x18, UInt8(offset), 0x20, 0xc8, 1, 0x2a, 5] + Array("robot".utf8) + [0x30, 1])
+        var expectedRequest: [UInt8] = [0x0a, 36]
+        expectedRequest += tenant.utf8
+        expectedRequest += [0x10, 1, 0x18, UInt8(offset), 0x20, 0xc8, 1, 0x2a, 5]
+        expectedRequest += "robot".utf8
+        expectedRequest += [0x30, 1]
+        #expect(request.message == expectedRequest)
         #expect(request.metadata.first { $0.name == "authorization" }?.value == Array("DPoP test-token".utf8))
         #expect(request.metadata.contains { $0.name == "x-correlation-id" && !$0.value.isEmpty })
         let proof = try #require(request.metadata.first { $0.name == "dpop" })
