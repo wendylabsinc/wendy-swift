@@ -1,0 +1,78 @@
+// Test-only Core caller: installed by build-core.py --test-host and removed
+// before any production build. No product workflow is implemented here.
+package main
+
+/*
+#include <stdint.h>
+#include <stdlib.h>
+*/
+import "C"
+
+import (
+    "context"
+    "encoding/json"
+    "errors"
+    "io"
+    "time"
+    "github.com/wendylabsinc/WendyOS/go/wendy-core/platform"
+    "github.com/wendylabsinc/WendyOS/go/wendy-core/platform/cbridge"
+)
+
+//export WendySwiftTestInvoke
+func WendySwiftTestInvoke(id C.uint64_t, operation C.uint32_t, timeout C.int64_t) *C.char {
+    result := struct {
+        Message []byte
+        Certificates [][]byte
+        Messages [][]byte
+        Initial platform.Metadata
+        Trailing platform.Metadata
+        Code uint32
+        Error string
+        StatusMessage string
+        Cancelled bool
+    }{}
+    host, ok := cbridge.Lookup(uint64(id))
+    var err error
+    if !ok { err = context.Canceled } else {
+        ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Millisecond)
+        defer cancel()
+        request := platform.RPCRequest{Method: "/test.Service/Call", Message: []byte{0,255,42}, Metadata: platform.Metadata{
+            {Name: "value", Value: []byte("one")}, {Name: "value", Value: []byte("two")}, {Name: "raw-bin", Value: []byte{0,255}},
+        }}
+        switch uint32(operation) {
+        case 1: result.Message, err = host.Sign(ctx, request.Message)
+        case 2: result.Certificates, err = host.CertificateChain(ctx)
+        case 3: result.Message, err = host.PublicKey(ctx)
+        case 4:
+            var response platform.RPCResponse
+            response, err = host.Unary(ctx, request)
+            result.Message, result.Initial, result.Trailing = response.Message, response.InitialMetadata, response.TrailingMetadata
+        case 5:
+            var stream platform.ServerStream
+            stream, err = host.ServerStream(ctx, request)
+            if err == nil {
+                defer stream.Close()
+                result.Initial, err = stream.Header()
+                for err == nil {
+                    var message []byte
+                    message, err = stream.Recv()
+                    if err == nil { result.Messages = append(result.Messages, append([]byte{}, message...)) }
+                }
+                if err == io.EOF { err = nil }
+                result.Trailing = stream.Trailer()
+            }
+        }
+    }
+    if err != nil {
+        result.Error = err.Error()
+        result.Cancelled = errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+        var status *platform.RPCStatusError
+        if errors.As(err, &status) {
+            result.Code = uint32(status.Code)
+            result.StatusMessage = status.Message
+            result.Initial, result.Trailing = status.InitialMetadata, status.TrailingMetadata
+        }
+    }
+    data, _ := json.Marshal(result)
+    return C.CString(string(data))
+}

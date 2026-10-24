@@ -13,39 +13,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Test (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Linux tests run in the official Swift image matching the runner's glibc.
-          - { os: ubuntu-22.04, swift-image: 'swift:6.2.1-jammy' }
-          - { os: ubuntu-24.04-arm, swift-image: 'swift:6.2.1-noble' }
-          - { os: macos-15 }
+  scripts:
     permissions:
       contents: read
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - if: runner.os == 'macOS'
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: '26.3'
-      - if: runner.os == 'Linux'
-        name: Test
-        env:
-          SWIFT_IMAGE: ${{ matrix.swift-image }}
-        run: docker run --rm -v "$PWD:/src" -w /src "$SWIFT_IMAGE" swift test --scratch-path /tmp/swift
-      - if: runner.os == 'macOS'
-        name: Test
-        run: swift test
-      - if: runner.os == 'macOS'
-        name: Compile and link the tests for iOS and the iOS Simulator
-        run: |
-          for destination in 'generic/platform=iOS' 'generic/platform=iOS Simulator'; do
-            xcodebuild build-for-testing -quiet -scheme wendy-swift \
-              -destination "$destination" -derivedDataPath .build/ios
-          done
+      - run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
+  test:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build.yml
