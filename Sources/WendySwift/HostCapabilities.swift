@@ -84,3 +84,23 @@ public protocol ServerStream: Sendable {
     /// May run on any executor. The binding calls this when the stream finishes.
     func close()
 }
+
+/// Host-owned cryptographically secure entropy for DPoP nonces and correlation IDs.
+public protocol Entropy: Sendable {
+    /// Return exactly count unpredictable bytes, honoring task cancellation.
+    func randomBytes(count: Int) async throws -> [UInt8]
+}
+
+/// Uses Swift's system random generator, backed by the platform's secure source.
+public struct SystemEntropy: Entropy {
+    public init() {}
+
+    public func randomBytes(count: Int) async throws -> [UInt8] {
+        guard (1...1_048_576).contains(count) else {
+            throw RPCStatusError(code: 3, message: "Invalid entropy byte count")
+        }
+        try Task.checkCancellation()
+        var generator = SystemRandomNumberGenerator()
+        return (0..<count).map { _ in UInt8.random(in: .min ... .max, using: &generator) }
+    }
+}
