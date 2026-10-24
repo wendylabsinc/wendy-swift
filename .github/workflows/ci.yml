@@ -26,3 +26,21 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/build.yml
+  package:
+    needs: test
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: test-core-*
+          path: .build/downloads
+      - name: Assemble and consume the release archive layout
+        run: |
+          python3 scripts/release.py collect --prefix test-core-
+          python3 scripts/release.py assemble
+          docker run --rm -v "$PWD:/src" -w /src swift:6.2.1-noble python3 scripts/smoke.py .build/release-assets
