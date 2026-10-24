@@ -5,22 +5,10 @@ import PackageDescription
 // WENDY_CORE_PATH names WendyOS/go/wendy-core after scripts/build.py swift.
 // Release tags replace only this block with checksummed binary URLs.
 // BEGIN BINARY TARGETS
-let corePath = Context.environment["WENDY_CORE_PATH"] ?? ".build/WendyOS/go/wendy-core"
 let binaryTargets: [Target] = [
-    ("CWendyCoreApple", "CWendyCore.xcframework"),
-    ("CWendyCoreLinux", "CWendyCore.artifactbundle"),
-].compactMap { name, file in
-    let root = URL(fileURLWithPath: Context.packageDirectory, isDirectory: true)
-    let artifact = URL(fileURLWithPath: corePath, relativeTo: root)
-        .appendingPathComponent("distributions/swift/artifacts/" + file).standardizedFileURL
-    guard FileManager.default.fileExists(atPath: artifact.path) else { return nil }
-    // SwiftPM requires relative binary paths, including for absolute overrides.
-    let base = root.standardizedFileURL.pathComponents
-    let parts = artifact.pathComponents
-    let common = zip(base, parts).prefix { $0 == $1 }.count
-    let path = (Array(repeating: "..", count: base.count - common) + parts.dropFirst(common)).joined(separator: "/")
-    return .binaryTarget(name: name, path: path)
-}
+    .binaryTarget(name: "CWendyCoreApple", url: "https://github.com/wendylabsinc/wendy-swift/releases/download/0.1.0-seed.2/CWendyCore.xcframework.zip", checksum: "23b329c6fb3d181203e69e8a37b4a54467b1b25b88d42f6e48f6a34a3740d87e"),
+    .binaryTarget(name: "CWendyCoreLinux", url: "https://github.com/wendylabsinc/wendy-swift/releases/download/0.1.0-seed.2/CWendyCore.artifactbundle.zip", checksum: "78bac5532cb617e3061cfbb338f1a541dd2852b90a1940590d3e1f6f5a57e649"),
+]
 // END BINARY TARGETS
 
 let binaryPlatforms: [String: [Platform]] = [
