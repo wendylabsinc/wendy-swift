@@ -51,7 +51,7 @@ public struct RPCResponse: Sendable, Equatable {
 /// Diagnostics must never contain credentials or private key material.
 public struct RPCStatusError: Error, Sendable, Equatable, CustomStringConvertible {
     public var description: String { "RPC failed with status \(code)" }
-    public var code: UInt32
+    public let code: UInt32
     public var message: String
     public var initialMetadata: [RPCMetadataEntry]
     public var trailingMetadata: [RPCMetadataEntry]
