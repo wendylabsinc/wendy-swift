@@ -37,14 +37,15 @@ let package = Package(
         .library(name: "WendySwift", targets: ["WendySwift"]),
         .library(name: "WendyCore", targets: ["WendyCore"]),
     ],
+    dependencies: [.package(url: "https://github.com/apple/swift-protobuf.git", from: "1.39.0")],
     targets: binaryTargets + [
         .target(name: "WendyCore", dependencies: coreDependencies,
                 swiftSettings: [.enableUpcomingFeature("InternalImportsByDefault")],
                 linkerSettings: [.linkedFramework("CoreFoundation", .when(platforms: [.iOS]))]),
-        .target(name: "WendySwift", dependencies: ["WendyCore"] + coreDependencies,
+        .target(name: "WendySwift", dependencies: ["WendyCore", .product(name: "SwiftProtobuf", package: "swift-protobuf")] + coreDependencies,
                 swiftSettings: [.enableUpcomingFeature("InternalImportsByDefault")]),
         .target(name: "BridgeSupport", path: "Tests/BridgeSupport", exclude: ["driver.go.txt"]),
-        .testTarget(name: "WendySwiftTests", dependencies: ["WendySwift", "WendyCore", "BridgeSupport"],
+        .testTarget(name: "WendySwiftTests", dependencies: ["WendySwift", "WendyCore", "BridgeSupport", .product(name: "SwiftProtobuf", package: "swift-protobuf")],
                     swiftSettings: bridgeTests ? [.define("WENDY_BRIDGE_TESTS")] : []),
     ]
 )

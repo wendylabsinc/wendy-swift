@@ -10,17 +10,35 @@ let version = Wendy.coreVersion
 ```
 
 Shared product behavior lives in Core. Swift supplies host capabilities through
-`Signer` and `Transport`: private keys, signing, TLS and networking stay with the
-host. `HostRegistration` connects these async, Sendable capabilities to Core's
+`Signer`, `Transport` and `Entropy`: private keys, signing, TLS, networking and
+secure random bytes stay with the host. `SystemEntropy` is the default entropy source. `HostRegistration` connects these async, Sendable capabilities to Core's
 C interface. Keep the registration alive for operations using its handle; call
 `close()` to cancel outstanding work (deinitialization also closes it).
 `ServerStream.next()` receives one message per Core request, without a binding
 prefetch queue. Hosts honor task cancellation and RPC deadlines, validate
 metadata, and retain remote status codes and trailers in `RPCStatusError`.
 
-No product operation consumes the host yet. The tests include a test-only Go
-caller exercising Core's real C adapters; the first shared feature will supply
-the product round trip. The binding adds no product logic or encryption.
+`CloudClient(host:authority:)` lists Cloud devices through Core:
+
+```swift
+let client = CloudClient(host: host, authority: "cloud.example:443")
+let devices = try await client.cloudDevices(
+    organizationID: tenantUUID, accessToken: boundAccessToken)
+```
+
+The host must validate its ML-DSA-65 key and token/tenant binding and bind its TLS
+transport to the authority before calling. `organizationID` is the immutable
+tenant UUID. Token refresh and connections remain host responsibilities.
+`CloudDevice` aliases the published Cloud v2 `Asset` protobuf, preserving optional
+and unknown fields. SwiftProtobuf supplies serialization. Core returns a complete
+bounded list or an error, with no public offset API or snapshot guarantee. Task
+cancellation cancels Core and throws `CancellationError`; other errors retain
+numeric gRPC status (including deadline code 4) and ordered binary metadata in
+`RPCStatusError`. Keep remote diagnostics and metadata out of logs.
+
+Cloud tests exercise the production C operation with fake capabilities. The
+other host bridge tests use a test-only Go caller. The binding adds no product
+logic or encryption.
 
 Platforms: macOS 15+, iOS 18+ (device and Simulator), Linux x64 (glibc 2.35+)
 and arm64 (glibc 2.39+). Requires Swift 6.2+. Each process must link at most one
@@ -62,6 +80,12 @@ The test caller is compiled into the same Go archive, so it adds no second Go
 runtime. Rebuild without `--test-host` for production. CI runs these tests on
 both Linux architectures and macOS, and compiles/links them for iOS device and
 Simulator without booting a simulator. iOS tests are not executed.
+
+To regenerate the checked-in Swift messages, build `protoc-gen-swift` from
+SwiftProtobuf 1.39.0, then run `python3 scripts/generate-protobuf.py --plugin
+/path/to/protoc-gen-swift`. It reads the pinned checkout's Core envelope and
+projects the unchanged Cloud `Asset`/`AssetKind` declarations, omitting unrelated
+service operations.
 
 ## Pre-release packaging
 

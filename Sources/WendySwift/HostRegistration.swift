@@ -10,10 +10,10 @@ public final class HostRegistration: Sendable {
     /// It is invalid after close. Never persist or transfer between processes.
     public let handle: UInt64
 
-    public init(signer: any Signer, transport: any Transport) throws {
+    public init(signer: any Signer, transport: any Transport, entropy: any Entropy = SystemEntropy()) throws {
         let algorithm = signer.algorithm
         guard !algorithm.isEmpty else { throw HostRegistrationError.emptyAlgorithm }
-        let context = Unmanaged.passRetained(HostContext(signer: signer, transport: transport))
+        let context = Unmanaged.passRetained(HostContext(signer: signer, transport: transport, entropy: entropy))
         let arena = HostArena()
         var callbacks = WendyHostCallbacks(
             context: context.toOpaque(), algorithm: arena.bytes(Array(algorithm.utf8)),
@@ -55,11 +55,13 @@ private struct HostCall: Sendable {
 private final class HostContext: Sendable {
     let signer: any Signer
     let transport: any Transport
+    let entropy: any Entropy
     let calls = Mutex<[UInt64: HostCall]>([:])
 
-    init(signer: any Signer, transport: any Transport) {
+    init(signer: any Signer, transport: any Transport, entropy: any Entropy) {
         self.signer = signer
         self.transport = transport
+        self.entropy = entropy
     }
 
     func start(_ call: UInt64, _ input: WendyHostRequest) {
@@ -80,6 +82,19 @@ private final class HostContext: Sendable {
                         complete(call, certificates: try await signer.certificateChain())
                     case UInt32(WendyHostPublicKey):
                         complete(call, response: RPCResponse(message: try await signer.publicKey()))
+                    case UInt32(WendyHostRandomBytes):
+                        guard request.message.count == 4 else {
+                            throw RPCStatusError(code: 3, message: "Invalid entropy byte count")
+                        }
+                        let count = request.message.reduce(0) { ($0 << 8) | Int($1) }
+                        guard (1...1_048_576).contains(count) else {
+                            throw RPCStatusError(code: 3, message: "Invalid entropy byte count")
+                        }
+                        let bytes = try await entropy.randomBytes(count: count)
+                        guard bytes.count == count else {
+                            throw RPCStatusError(code: 13, message: "Invalid entropy response length")
+                        }
+                        complete(call, response: RPCResponse(message: bytes))
                     case UInt32(WendyHostUnary):
                         complete(call, response: try await transport.unary(request))
                     case UInt32(WendyHostServerStream):
